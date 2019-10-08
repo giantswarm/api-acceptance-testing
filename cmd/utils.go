@@ -50,12 +50,20 @@ func exitIfError(err error) {
 	if err == nil {
 		return
 	}
-
-	fmt.Printf("%s: %s\n", color.RedString("ERROR"), color.WhiteString(err.Error()))
-	fmt.Printf("Details: %#v\n", err)
+	complain(err)
 	os.Exit(1)
 }
 
-func printSuccess(message string) {
-	fmt.Printf("%s: %s\n", color.GreenString("OK"), color.WhiteString(message))
+// complainIfError handles an error of it gets one, by printing it
+// but does not exit.
+func complain(err error) {
+	if err == nil {
+		return
+	}
+
+	fmt.Printf("%s: %s\n", color.RedString("ERROR"), color.WhiteString(err.Error()))
+}
+
+func printSuccess(message string, v ...interface{}) {
+	fmt.Printf("%s: %s\n", color.GreenString("OK"), color.WhiteString(message, v...))
 }

@@ -24,8 +24,14 @@ github.com/giantswarm/gsclientgen v0.0.0-20190918113630-d602960d2594 h1:XZ5a8BsS
 github.com/giantswarm/gsclientgen v0.0.0-20190918113630-d602960d2594/go.mod h1:w3fPQmyNcZPB0I/eULLADOfkk0VTSn8Pijvj7JacnNQ=
 github.com/giantswarm/microerror v0.0.0-20190815145748-cb07ec533b50 h1:QvSOi2v0Ks/B4chcyvlcb7RTZOQEebaHgdXEfunT9Mk=
 github.com/giantswarm/microerror v0.0.0-20190815145748-cb07ec533b50/go.mod h1://Lo9dKJ8P2TBciuky5fDHEItccyvZOWE+B/0JiJT8A=
+github.com/giantswarm/micrologger v0.0.0-20191014091141-d866337f7393 h1:iwdDYJLDPkWo71fPO57Q40qNsjpXlH/KNznqgByo0xA=
+github.com/giantswarm/micrologger v0.0.0-20191014091141-d866337f7393/go.mod h1:2O9GG1AfKI8px8oseWx+TTD6A6aEdUo16ZjAKv2wOVk=
 github.com/globalsign/mgo v0.0.0-20180905125535-1ca0a4f7cbcb/go.mod h1:xkRDCp4j0OGD1HRkm4kmhM+pmpv3AKq5SU7GMg4oO/Q=
 github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8/go.mod h1:xkRDCp4j0OGD1HRkm4kmhM+pmpv3AKq5SU7GMg4oO/Q=
+github.com/go-kit/kit v0.9.0 h1:wDJmvq38kDhkVxi50ni9ykkdUr1PKgqKOoi01fa0Mdk=
+github.com/go-kit/kit v0.9.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
+github.com/go-logfmt/logfmt v0.4.0 h1:MP4Eh7ZCb31lleYCFuwm0oe4/YGak+5l1vA2NOE80nA=
+github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
 github.com/go-openapi/analysis v0.0.0-20180825180245-b006789cd277/go.mod h1:k70tL6pCuVxPJOHXQ+wIac1FUrvNkHolPie/cLEU6hI=
 github.com/go-openapi/analysis v0.17.0/go.mod h1:IowGgpVeD0vNm45So8nr+IcQ3pxVtpRoBWb8PVZO0ik=
 github.com/go-openapi/analysis v0.18.0/go.mod h1:IowGgpVeD0vNm45So8nr+IcQ3pxVtpRoBWb8PVZO0ik=
@@ -89,6 +95,7 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/juju/errgo v0.0.0-20140925100237-08cceb5d0b53 h1:tGpfbOOO0SV3qtMUx8O9RbJeei6VDBwnpQQ0JYIFaVg=
 github.com/juju/errgo v0.0.0-20140925100237-08cceb5d0b53/go.mod h1:ZtgUe3RyZisw/AlQjgU9DeO3hqUH9E/bkreI2FLg/QY=
+github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=

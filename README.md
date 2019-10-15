@@ -20,14 +20,21 @@
       [![GoDoc](https://godoc.org/github.com/giantswarm/REPOSITORY_NAME?status.svg)](http://godoc.org/github.com/giantswarm/REPOSITORY_NAME)
 
 -->
-[![CircleCI](https://circleci.com/gh/giantswarm/template.svg?style=shield&circle-token=cbabd7d13186f190fca813db4f0c732b026f5f6c)](https://circleci.com/gh/giantswarm/template)
 
-# template
+# Node Pools Acceptance Tests
 
-This is a template repository containing some basic files every repository
-needs.
+Usage:
 
-To use it just hit `Use this template` button or [this
-link][generate].
+```
+# cd to gopath
+git clone https://github.com/giantswarm/node-pools-acceptance-test.git
+cd node-pools-acceptance-test
+go build
 
-[generate]: https://github.com/giantswarm/template/generate
+./node-pools-acceptance-test run \
+  --endpoint (gsctl info|grep "API endpoint:"|awk '{print $3}') \
+  --scheme Bearer --token (gsctl info -v|grep "Auth token:"|awk '{print $3}')
+```
+
+Make sure that you are logged in to a `gsctl` endpoint. Check using `gsctl info` when in doubt.
+

@@ -23,11 +23,12 @@ func (f *flag) Validate() error {
 	if f.Endpoint == "" {
 		return microerror.Maskf(invalidFlagsError, "flag --endpoint must be used")
 	}
-	if f.Scheme == "" {
-		return microerror.Maskf(invalidFlagsError, "flag --scheme must not be empty")
-	}
 	if f.AuthToken == "" {
 		return microerror.Maskf(invalidFlagsError, "flag --token must not be empty")
 	}
+	if f.Scheme != "giantswarm" && f.Scheme != "Bearer" {
+		return microerror.Maskf(invalidFlagsError, "flag --scheme must be used and must be 'Bearer' or 'giantswarm' (case sensitive)")
+	}
+
 	return nil
 }

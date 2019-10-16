@@ -31,6 +31,13 @@ spec:
     spec:
       securityContext:
         runAsUser: 1000
+      # TODO: remove once the clusters have worker nodes
+      nodeSelector:
+        kubernetes.io/role: master
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      # TODO end
       containers:
       - name: helloworld
         image: giantswarm/helloworld:latest
@@ -47,7 +54,7 @@ metadata:
   namespace: default
 spec:
   rules:
-  - host: helloworld.YOUR_CLUSTER_BASE_DOMAIN
+  - host: helloworld.CLUSTER_BASE_DOMAIN
     http:
       paths:
       - path: /

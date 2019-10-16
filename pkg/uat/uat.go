@@ -50,8 +50,8 @@ func Test01ClusterCreation(giantSwarmClient *gsclient.Gsclientgen, authWriter ru
 	}
 
 	// Verify cluster details
-	if creationResult.Payload.Name == "" {
-		cliutil.Complain(microerror.New("Cluster name is empty"))
+	if creationResult.Payload.Name != "Unnamed cluster" {
+		cliutil.Complain(microerror.Newf("Cluster name is not 'Unnamed cluster' but '%s'", creationResult.Payload.Name))
 	}
 	if creationResult.Payload.APIEndpoint == "" {
 		cliutil.Complain(microerror.New("Cluster api_endpoint is empty"))
@@ -196,12 +196,41 @@ func Test07GetKubernetesNodes(kubeconfigPath string) error {
 		return microerror.Mask(err)
 	}
 
-	cliutil.PrintSuccess("kubectl get nodes exited with code %d and printed:\n", exitCode, out)
+	cliutil.PrintSuccess("kubectl get nodes exited with code %d and printed:\n\n", exitCode)
+	cliutil.PrintInfo(out)
 	return nil
 }
 
-func cleanupKeyPairID(id string) string {
-	return strings.Replace(id, ":", "", -1)
+// Test08DeployHelloworld attempts to deploy a helloworld app on the cluster.
+func Test08DeployHelloworld(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
+	// cluster base domain based on API endpoint
+	clusterBaseDomain := strings.Replace(clusterAPIEndpoint, "https://api.", "", 1)
+
+	templatePath := "./helloworld-manifest.yaml.template"
+	manifestPath := "./helloworld-manifest.yaml"
+	fs := afero.NewOsFs()
+	templateData, err := afero.ReadFile(fs, templatePath)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	manifest := strings.Replace(string(templateData), "CLUSTER_BASE_DOMAIN", clusterBaseDomain, -1)
+	err = afero.WriteFile(fs, manifestPath, []byte(manifest), 0644)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	out, exitCode, err := shell.RunCommand(context.Background(), "kubectl", []string{}, "--kubeconfig", kubeconfigPath, "apply", "-f", manifestPath)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	endpoint := "http://helloworld." + clusterBaseDomain
+
+	cliutil.PrintSuccess("kubectl apply exited with code %d and printed:\n\n", exitCode)
+	cliutil.PrintInfo(out)
+	cliutil.PrintInfo("helloworld should be reachable at %s", endpoint)
+	return endpoint, nil
 }
 
 // Test20ClusterDeletion tests whether a cluster gets deleted okay.

@@ -64,14 +64,11 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	cliutil.ExitIfError(err)
 
 	// 1. Create a cluster with one node pool based on defaults.
-	// fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults\n")
-	// clusterOneID, clusterOneAPIEndpoint, err := uat.Test01ClusterCreation(giantSwarmClient, authWriter)
-	// cliutil.ExitIfError(err)
+	fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults\n")
+	clusterOneID, clusterOneAPIEndpoint, err := uat.Test01ClusterCreation(giantSwarmClient, authWriter)
+	cliutil.ExitIfError(err)
 
 	time.Sleep(3 * time.Second)
-
-	clusterOneID := "zwm5s"
-	clusterOneAPIEndpoint := ""
 
 	// Workaround until step 1 returns proper cluster info.
 	if clusterOneAPIEndpoint == "" {

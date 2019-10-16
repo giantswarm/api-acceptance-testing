@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
+	"github.com/giantswarm/microerror"
 )
 
 // ExitIfError handles an error of it gets one, by printing it
@@ -25,9 +26,15 @@ func Complain(err error) {
 	}
 
 	fmt.Printf("%s: %s\n", color.RedString("ERROR"), color.WhiteString(err.Error()))
+	fmt.Println(microerror.Stack(err))
 }
 
 // PrintSuccess just prints a success message.
 func PrintSuccess(message string, v ...interface{}) {
 	fmt.Printf("%s: %s\n", color.GreenString("OK"), color.WhiteString(message, v...))
+}
+
+// PrintInfo just logs an info.
+func PrintInfo(message string, v ...interface{}) {
+	fmt.Printf("INFO: %s\n", fmt.Sprintf(message, v...))
 }

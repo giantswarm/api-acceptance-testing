@@ -4,8 +4,6 @@ import (
 	"context"
 	"strconv"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func Test_RunCommand(t *testing.T) {
@@ -14,7 +12,7 @@ func Test_RunCommand(t *testing.T) {
 		executable       string
 		envVars          []string
 		arguments        []string
-		expectedOutput   string
+		expectedOutput   []string
 		expectedExitCode int
 		errorMatcher     func(err error) bool
 	}{
@@ -23,7 +21,7 @@ func Test_RunCommand(t *testing.T) {
 			executable:       "sdfsdgg",
 			envVars:          []string{},
 			arguments:        []string{"foo"},
-			expectedOutput:   "",
+			expectedOutput:   []string{""},
 			expectedExitCode: -1,
 			errorMatcher:     IsCoudlNotStart,
 		},
@@ -32,16 +30,19 @@ func Test_RunCommand(t *testing.T) {
 			executable:       "sleep",
 			envVars:          []string{},
 			arguments:        []string{"1"},
-			expectedOutput:   "",
+			expectedOutput:   []string{""},
 			expectedExitCode: 0,
 			errorMatcher:     nil,
 		},
 		{
-			name:             "case 2: ls nonexist",
-			executable:       "ls",
-			envVars:          []string{},
-			arguments:        []string{"nonexist"},
-			expectedOutput:   "ls: nonexist: No such file or directory\n",
+			name:       "case 2: ls nonexist",
+			executable: "ls",
+			envVars:    []string{},
+			arguments:  []string{"nonexist"},
+			expectedOutput: []string{
+				"ls: nonexist: No such file or directory\n",
+				"ls: cannot access 'nonexist': No such file or directory\n",
+			},
 			expectedExitCode: 1,
 			errorMatcher:     IsProblemInExecution,
 		},
@@ -50,7 +51,7 @@ func Test_RunCommand(t *testing.T) {
 			executable:       "bash",
 			envVars:          []string{"TESTVAR=myecho"},
 			arguments:        []string{"-c", "echo -n ${TESTVAR}"},
-			expectedOutput:   "myecho",
+			expectedOutput:   []string{"myecho"},
 			expectedExitCode: 0,
 			errorMatcher:     nil,
 		},
@@ -75,9 +76,18 @@ func Test_RunCommand(t *testing.T) {
 				t.Errorf("Got exit code %d, expected %d", exitCode, tc.expectedExitCode)
 			}
 
-			if !cmp.Equal(output, tc.expectedOutput) {
-				t.Fatalf("\n\n%s\n", cmp.Diff(tc.expectedOutput, output))
+			if !stringSliceContains(tc.expectedOutput, output) {
+				t.Fatalf("\n\nUnexpected output: %s\n", output)
 			}
 		})
 	}
+}
+
+func stringSliceContains(stringSlice []string, needle string) bool {
+	for _, elmt := range stringSlice {
+		if elmt == needle {
+			return true
+		}
+	}
+	return false
 }

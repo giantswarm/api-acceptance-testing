@@ -3,8 +3,11 @@ package uat
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
+	"github.com/cenkalti/backoff"
 	gsclient "github.com/giantswarm/gsclientgen/client"
 	"github.com/giantswarm/gsclientgen/client/clusters"
 	"github.com/giantswarm/gsclientgen/client/info"
@@ -201,8 +204,8 @@ func Test07GetKubernetesNodes(kubeconfigPath string) error {
 	return nil
 }
 
-// Test08DeployHelloworld attempts to deploy a helloworld app on the cluster.
-func Test08DeployHelloworld(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
+// Test08DeployTestApp attempts to deploy a helloworld app on the cluster.
+func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
 	// cluster base domain based on API endpoint
 	clusterBaseDomain := strings.Replace(clusterAPIEndpoint, "https://api.", "", 1)
 
@@ -227,9 +230,22 @@ func Test08DeployHelloworld(kubeconfigPath string, clusterAPIEndpoint string) (s
 
 	endpoint := "http://test." + clusterBaseDomain
 
+	// Wait for the ingress to be reachable.
+	start := time.Now()
+	operation := func() error {
+		_, err := http.Get(endpoint)
+		return err
+	}
+	err = backoff.Retry(operation, backoff.NewConstantBackOff(1*time.Second))
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	duration := time.Now().Sub(start)
+	cliutil.PrintInfo("Ingress at %s reached after %s", endpoint, duration)
+
 	cliutil.PrintSuccess("kubectl apply exited with code %d and printed:\n\n", exitCode)
 	cliutil.PrintInfo(out)
-	cliutil.PrintInfo("helloworld should be reachable at %s", endpoint)
 	return endpoint, nil
 }
 

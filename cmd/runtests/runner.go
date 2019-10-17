@@ -106,7 +106,7 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 
 	// 8. Deploy helloworld
 	fmt.Printf("\nStep 8 - Deploy helloworld\n")
-	_, err = uat.Test08DeployHelloworld(kubeconfigPath, clusterOneAPIEndpoint)
+	_, err = uat.Test08DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
 	cliutil.ExitIfError(err)
 
 	//20. Delete cluster one.

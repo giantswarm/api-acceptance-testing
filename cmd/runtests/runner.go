@@ -83,6 +83,7 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 		clusterOneAPIEndpoint = result.Payload.APIEndpoint
 	}
 
+	// We wait after cluster creation, otherwise fetching cluster details frequently fails.
 	time.Sleep(3 * time.Second)
 
 	// 2. Create a node pool based on defaults.
@@ -105,9 +106,13 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	cliutil.ExitIfError(err)
 
 	// 8. Deploy helloworld
-	fmt.Printf("\nStep 8 - Deploy helloworld\n")
-	_, err = uat.Test08DeployHelloworld(kubeconfigPath, clusterOneAPIEndpoint)
+	fmt.Printf("\nStep 8 - Deploy test app\n")
+	testAppURL, err := uat.Test08DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
 	cliutil.ExitIfError(err)
+
+	// 9. Create load
+	fmt.Printf("\nStep 9 - Create load on test app\n")
+	uat.Test09CreateLoadOnIngress(testAppURL)
 
 	//20. Delete cluster one.
 	// fmt.Printf("\nStep 20 - Delete cluster\n")

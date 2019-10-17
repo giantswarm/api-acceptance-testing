@@ -206,8 +206,8 @@ func Test08DeployHelloworld(kubeconfigPath string, clusterAPIEndpoint string) (s
 	// cluster base domain based on API endpoint
 	clusterBaseDomain := strings.Replace(clusterAPIEndpoint, "https://api.", "", 1)
 
-	templatePath := "./helloworld-manifest.yaml.template"
-	manifestPath := "./helloworld-manifest.yaml"
+	templatePath := "./testapp-manifest.yaml.template"
+	manifestPath := "./testapp-manifest.yaml"
 	fs := afero.NewOsFs()
 	templateData, err := afero.ReadFile(fs, templatePath)
 	if err != nil {
@@ -225,7 +225,7 @@ func Test08DeployHelloworld(kubeconfigPath string, clusterAPIEndpoint string) (s
 		return "", microerror.Mask(err)
 	}
 
-	endpoint := "http://helloworld." + clusterBaseDomain
+	endpoint := "http://test." + clusterBaseDomain
 
 	cliutil.PrintSuccess("kubectl apply exited with code %d and printed:\n\n", exitCode)
 	cliutil.PrintInfo(out)

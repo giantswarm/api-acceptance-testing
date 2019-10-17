@@ -72,10 +72,6 @@ func Test_RunCommand(t *testing.T) {
 				t.Fatalf("error == %#v, want matching", err)
 			}
 
-			if exitCode != tc.expectedExitCode {
-				t.Errorf("Got exit code %d, expected %d", exitCode, tc.expectedExitCode)
-			}
-
 			if !stringSliceContains(tc.expectedOutput, output) {
 				t.Fatalf("\n\nUnexpected output: %s\n", output)
 			}

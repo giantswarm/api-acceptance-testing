@@ -228,7 +228,7 @@ func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (stri
 		return "", microerror.Mask(err)
 	}
 
-	endpoint := "http://test." + clusterBaseDomain
+	endpoint := "http://test." + clusterBaseDomain + "/delay/1"
 
 	// Wait for the ingress to be reachable.
 	start := time.Now()

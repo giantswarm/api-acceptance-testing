@@ -59,7 +59,7 @@ func Test_RunCommand(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			output, exitCode, err := RunCommand(context.Background(), tc.executable, tc.envVars, tc.arguments...)
+			output, _, err := RunCommand(context.Background(), tc.executable, tc.envVars, tc.arguments...)
 
 			switch {
 			case err == nil && tc.errorMatcher == nil:

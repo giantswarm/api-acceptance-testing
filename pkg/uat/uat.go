@@ -251,6 +251,11 @@ func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (stri
 	return endpoint, nil
 }
 
+// Test09CreateLoadOnIngress sets a constant load on the given URL.
+func Test09CreateLoadOnIngress(ingressEndpoint string) {
+	go load.ProduceLoad(ingressEndpoint, 3*time.Hour, 100_000_000)
+}
+
 // Test20ClusterDeletion tests whether a cluster gets deleted okay.
 func Test20ClusterDeletion(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter, clusterID string) error {
 	deleteClusterOneParams := clusters.NewDeleteClusterParams().WithClusterID(clusterID)

@@ -20,6 +20,7 @@ import (
 
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/cliutil"
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/kubeconfig"
+	"github.com/giantswarm/node-pools-acceptance-test/pkg/load"
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/shell"
 )
 
@@ -205,6 +206,7 @@ func Test07GetKubernetesNodes(kubeconfigPath string) error {
 }
 
 // Test08DeployTestApp attempts to deploy a helloworld app on the cluster.
+// Returns the ingress URL of the app.
 func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
 	// cluster base domain based on API endpoint
 	clusterBaseDomain := strings.Replace(clusterAPIEndpoint, "https://api.", "", 1)

@@ -238,8 +238,14 @@ func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (stri
 	// Wait for the ingress to be reachable.
 	start := time.Now()
 	operation := func() error {
-		_, err := http.Get(endpoint)
-		return err
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			return err
+		} else if resp.StatusCode >= 400 {
+			return microerror.Mask(fmt.Errorf("Got bad response from endpoint: status code %d", resp.StatusCode))
+		}
+
+		return nil
 	}
 	err = backoff.Retry(operation, backoff.NewConstantBackOff(1*time.Second))
 	if err != nil {

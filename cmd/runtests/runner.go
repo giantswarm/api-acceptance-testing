@@ -114,6 +114,10 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	fmt.Printf("\nStep 9 - Create load on test app - %s\n", time.Now())
 	uat.Test09CreateLoadOnIngress(testAppURL)
 
+	// 10. Increase replicas
+	fmt.Printf("\nStep 10 - Increase test app replicas - %s\n", time.Now())
+	uat.Test10IncreaseReplicas(kubeconfigPath)
+
 	//20. Delete cluster one.
 	// fmt.Printf("\nStep 20 - Delete cluster - %s\n", time.Now())
 	// err = uat.Test20ClusterDeletion(giantSwarmClient, authWriter, clusterOneID)

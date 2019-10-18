@@ -256,6 +256,18 @@ func Test09CreateLoadOnIngress(ingressEndpoint string) {
 	go load.ProduceLoad(ingressEndpoint, 3*time.Hour, 100_000_000)
 }
 
+// Test10IncreaseReplicas increases the test app replicas.
+func Test10IncreaseReplicas(kubeconfigPath string) error {
+	out, exitCode, err := shell.RunCommand(context.Background(), "kubectl", []string{}, "--kubeconfig", kubeconfigPath, "scale", "--replicas=5", "deployment/e2e-app")
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	cliutil.PrintSuccess("kubectl scale exited with code %d and printed:\n\n", exitCode)
+	cliutil.PrintInfo(out)
+	return nil
+}
+
 // Test20ClusterDeletion tests whether a cluster gets deleted okay.
 func Test20ClusterDeletion(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter, clusterID string) error {
 	deleteClusterOneParams := clusters.NewDeleteClusterParams().WithClusterID(clusterID)

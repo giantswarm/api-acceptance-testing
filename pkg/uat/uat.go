@@ -46,7 +46,10 @@ func Test01ClusterCreation(giantSwarmClient *gsclient.Gsclientgen, authWriter ru
 	var err error
 
 	org := "giantswarm"
-	req := &models.V5AddClusterRequest{Owner: &org}
+	req := &models.V5AddClusterRequest{
+		Owner:          &org,
+		ReleaseVersion: "8.6.0", // TODO: temporary hack
+	}
 	params := clusters.NewAddClusterV5Params().WithBody(req)
 	creationResult, err = giantSwarmClient.Clusters.AddClusterV5(params, authWriter)
 	if err != nil {

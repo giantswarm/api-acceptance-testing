@@ -1,6 +1,8 @@
 package uat
 
-import "strings"
+import (
+	"strings"
+)
 
 func cleanupKeyPairID(id string) string {
 	return strings.Replace(id, ":", "", -1)

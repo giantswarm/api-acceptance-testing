@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	gsclient "github.com/giantswarm/gsclientgen/client"
 	"github.com/giantswarm/gsclientgen/client/clusters"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
-	"github.com/go-openapi/runtime"
 	"github.com/spf13/cobra"
 
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/client"
@@ -45,37 +43,44 @@ func (r *runner) Run(cmd *cobra.Command, args []string) error {
 
 func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) error {
 	// Initialize client
-	var authWriter runtime.ClientAuthInfoWriter
-	var giantSwarmClient *gsclient.Gsclientgen
+	var apiClient *client.Client
 	{
 		var err error
 
 		fmt.Printf("API Endpoint: %s\n", r.flag.Endpoint)
 
-		authWriter, err = client.ClientAuth(r.flag.Scheme, r.flag.AuthToken)
-		cliutil.ExitIfError(err)
-
-		giantSwarmClient, err = client.NewClient(r.flag.Endpoint)
+		apiClient, err = client.New(r.flag.Endpoint)
 		cliutil.ExitIfError(err)
 	}
 
 	// test client and authentication
-	err := uat.TestClient(giantSwarmClient, authWriter)
+	err := uat.TestClient(apiClient)
 	cliutil.ExitIfError(err)
 
-	// 1. Create a cluster with one node pool based on defaults.
-	fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults - %s\n", time.Now())
-	clusterOneID, clusterOneAPIEndpoint, err := uat.Test01ClusterCreation(giantSwarmClient, authWriter)
-	cliutil.ExitIfError(err)
+	var clusterOneID string
+	var clusterOneAPIEndpoint string
+	var nodePoolOneID string
 
-	time.Sleep(3 * time.Second)
+	if r.flag.ClusterID == "" {
+		// 1. Create a cluster with one node pool based on defaults.
+		fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults - %s\n", time.Now())
+		clusterOneID, clusterOneAPIEndpoint, err = uat.CreateClusterUsingDefaults(apiClient)
+		cliutil.ExitIfError(err)
+	} else {
+		clusterOneID = r.flag.ClusterID
+	}
 
 	// Workaround until step 1 returns proper cluster info.
 	if clusterOneAPIEndpoint == "" {
 		fmt.Printf("\nStep 1a - Get cluster details, so we know the API endpoint - %s\n", time.Now())
 		var params *clusters.GetClusterV5Params
 		params = clusters.NewGetClusterV5Params().WithClusterID(clusterOneID)
-		result, err := giantSwarmClient.Clusters.GetClusterV5(params, authWriter)
+		authWriter, err := apiClient.AuthHeaderWriter()
+		if err != nil {
+			cliutil.ExitIfError(microerror.Mask(err))
+		}
+
+		result, err := apiClient.GSClientGen.Clusters.GetClusterV5(params, authWriter)
 		if err != nil {
 			cliutil.ExitIfError(microerror.Mask(err))
 		}
@@ -83,44 +88,73 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 		clusterOneAPIEndpoint = result.Payload.APIEndpoint
 	}
 
-	// We wait after cluster creation, otherwise fetching cluster details frequently fails.
-	time.Sleep(3 * time.Second)
+	if r.flag.FirstNodePoolID == "" {
+		// 2. Create a node pool based on defaults.
+		fmt.Printf("\nStep 2 - Create a node pool based on defaults\n")
+		nodePoolOneID, err = uat.CreateNodePoolUsingDefaults(apiClient, clusterOneID)
+		cliutil.ExitIfError(err)
 
-	// 2. Create a node pool based on defaults.
-	// fmt.Printf("\nStep 2 - Create a node pool based on defaults\n")
-	// _, err = uat.Test02NodePoolCreationUsingDefaults(giantSwarmClient, authWriter, clusterOneID)
-	// cliutil.ExitIfError(err)
-
-	//time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second)
+	} else {
+		nodePoolOneID = r.flag.FirstNodePoolID
+	}
 
 	// Create key pair
-	fmt.Printf("\nStep 6 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
-	kubeconfigPath, err := uat.Test06CreateKeyPair(giantSwarmClient, authWriter, clusterOneID, clusterOneAPIEndpoint)
+	fmt.Printf("\nStep 3 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
+	kubeconfigPath, err := uat.CreateKeyPair(apiClient, clusterOneID, clusterOneAPIEndpoint)
 	cliutil.ExitIfError(err)
 
-	fmt.Printf("\nStep 7 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
+	// Test kubectl access
+	fmt.Printf("\nStep 4 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
 	operation := func() error {
-		return uat.Test07GetKubernetesNodes(kubeconfigPath)
+		return uat.RunKubectlCommandToTestKeyPair(kubeconfigPath)
 	}
 	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
 	cliutil.ExitIfError(err)
 
-	// 8. Deploy test app
-	fmt.Printf("\nStep 8 - Deploy test app\n - %s", time.Now())
-	testAppURL, err := uat.Test08DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
+	// Deploy test app
+	fmt.Printf("\nStep 5 - Deploy test app - %s", time.Now())
+	testAppURL, err := uat.DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
 	cliutil.ExitIfError(err)
 
-	// 9. Create load
-	fmt.Printf("\nStep 9 - Create load on test app - %s\n", time.Now())
-	uat.Test09CreateLoadOnIngress(testAppURL)
+	// Create load
+	fmt.Printf("\nStep 6 - Create load on test app - %s\n", time.Now())
+	uat.CreateLoadOnIngress(testAppURL)
 
-	// 10. Increase replicas
-	fmt.Printf("\nStep 10 - Increase test app replicas - %s\n", time.Now())
-	uat.Test10IncreaseReplicas(kubeconfigPath)
+	// Increase replicas
+	fmt.Printf("\nStep 7 - Increase test app replicas - %s\n", time.Now())
+	uat.IncreaseTestAppReplicas(kubeconfigPath)
 
-	//20. Delete cluster one.
+	// wait for nodepool scaling
+	cliutil.PrintInfo("Waiting 10 minutes for node pool to adapt")
+	for i := 0; i < 10; i++ {
+		time.Sleep(60 * time.Second)
+		details, err := uat.GetNodePoolDetails(apiClient, clusterOneID, nodePoolOneID)
+		cliutil.Complain(err)
+
+		if details != nil {
+			cliutil.PrintInfo("Node pool details - nodes desired: %d, nodes in state ready: %d", details.Status.Nodes, details.Status.NodesReady)
+		}
+	}
+
+	// rename only node pool
+	fmt.Printf("\nStep 8 - Renaming only node pool %s - %s\n", nodePoolOneID, time.Now())
+	err = uat.RenameNodePool(apiClient, clusterOneID, nodePoolOneID, "First test node pool")
+	cliutil.Complain(err)
+
+	// scale only node pool
+	fmt.Printf("\nStep 9 - Scaling only node pool %s to min=2/max=2 - %s\n", nodePoolOneID, time.Now())
+	err = uat.ScaleNodePool(apiClient, clusterOneID, nodePoolOneID, 2, 2)
+	cliutil.Complain(err)
+
+	// delete only node pool
+	// fmt.Printf("\nStep 10 - Deleting only node pool %s - %s\n", nodePoolOneID, time.Now())
+	// err = uat.DeleteNodePool(apiClient, clusterOneID, nodePoolOneID)
+	// cliutil.Complain(err)
+
+	// Delete cluster one.
 	// fmt.Printf("\nStep 20 - Delete cluster - %s\n", time.Now())
-	// err = uat.Test20ClusterDeletion(giantSwarmClient, authWriter, clusterOneID)
+	// err = uat.Test20ClusterDeletion(apiClient, clusterOneID)
 	// cliutil.ExitIfError(err)
 
 	return nil

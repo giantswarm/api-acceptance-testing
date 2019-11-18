@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	gsclient "github.com/giantswarm/gsclientgen/client"
 	"github.com/giantswarm/gsclientgen/client/clusters"
 	"github.com/giantswarm/gsclientgen/client/info"
 	"github.com/giantswarm/gsclientgen/client/key_pairs"
 	"github.com/giantswarm/gsclientgen/client/nodepools"
 	"github.com/giantswarm/gsclientgen/models"
 	"github.com/giantswarm/microerror"
-	"github.com/go-openapi/runtime"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/afero"
 
+	"github.com/giantswarm/node-pools-acceptance-test/pkg/client"
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/cliutil"
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/kubeconfig"
 	"github.com/giantswarm/node-pools-acceptance-test/pkg/load"
@@ -25,9 +25,14 @@ import (
 )
 
 // TestClient verifies whether the given client can authenticate.
-func TestClient(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter) error {
+func TestClient(giantSwarmClient *client.Client) error {
 	params := info.NewGetInfoParams()
-	infoResponse, err := giantSwarmClient.Info.GetInfo(params, authWriter)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	infoResponse, err := giantSwarmClient.GSClientGen.Info.GetInfo(params, authWriter)
 	if err != nil {
 		return microerror.Mask(err)
 	}
@@ -38,12 +43,17 @@ func TestClient(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.Clien
 	return nil
 }
 
-// Test01ClusterCreation tests
+// CreateClusterUsingDefaults tests
 // - whether we can create a cluster
 // - whether defaults are applied as expected.
-func Test01ClusterCreation(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter) (string, string, error) {
+func CreateClusterUsingDefaults(giantSwarmClient *client.Client) (string, string, error) {
 	var creationResult *clusters.AddClusterV5Created
 	var err error
+
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return "", "", microerror.Mask(err)
+	}
 
 	org := "giantswarm"
 	req := &models.V5AddClusterRequest{
@@ -51,7 +61,7 @@ func Test01ClusterCreation(giantSwarmClient *gsclient.Gsclientgen, authWriter ru
 		ReleaseVersion: "8.6.0", // TODO: temporary hack
 	}
 	params := clusters.NewAddClusterV5Params().WithBody(req)
-	creationResult, err = giantSwarmClient.Clusters.AddClusterV5(params, authWriter)
+	creationResult, err = giantSwarmClient.GSClientGen.Clusters.AddClusterV5(params, authWriter)
 	if err != nil {
 		return "", "", microerror.Mask(err)
 	}
@@ -87,14 +97,18 @@ func Test01ClusterCreation(giantSwarmClient *gsclient.Gsclientgen, authWriter ru
 	return creationResult.Payload.ID, creationResult.Payload.APIEndpoint, nil
 }
 
-// Test02NodePoolCreationUsingDefaults ensures that a node pool can be created with minimal spec and defaults apply.
-func Test02NodePoolCreationUsingDefaults(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter, clusterID string) (string, error) {
+// CreateNodePoolUsingDefaults ensures that a node pool can be created with minimal spec and defaults apply.
+func CreateNodePoolUsingDefaults(giantSwarmClient *client.Client, clusterID string) (string, error) {
 	var err error
 	var creationResult *nodepools.AddNodePoolCreated
 
 	req := &models.V5AddNodePoolRequest{}
-	params := nodepools.NewAddNodePoolParams().WithBody(req)
-	creationResult, err = giantSwarmClient.Nodepools.AddNodePool(params, authWriter)
+	params := nodepools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+	creationResult, err = giantSwarmClient.GSClientGen.Nodepools.AddNodePool(params, authWriter)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
@@ -159,9 +173,65 @@ func Test02NodePoolCreationUsingDefaults(giantSwarmClient *gsclient.Gsclientgen,
 
 }
 
-// Test06CreateKeyPair tests key pair creation for the new cluster
+// CreateNodePoolWithCustomParams checks the creation of a node pool with some custom properties.
+func CreateNodePoolWithCustomParams(giantSwarmClient *client.Client, clusterID string, instanceType string, availabilityZones []string) (string, error) {
+	var err error
+	var creationResult *nodepools.AddNodePoolCreated
+
+	// Build request body using the given arguments.
+	req := &models.V5AddNodePoolRequest{}
+	if instanceType != "" {
+		req.NodeSpec = &models.V5AddNodePoolRequestNodeSpec{
+			Aws: &models.V5AddNodePoolRequestNodeSpecAws{
+				InstanceType: instanceType,
+			},
+		}
+	}
+	if len(availabilityZones) != 0 {
+		req.AvailabilityZones = &models.V5AddNodePoolRequestAvailabilityZones{
+			Zones: availabilityZones,
+		}
+	}
+
+	params := nodepools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+	creationResult, err = giantSwarmClient.GSClientGen.Nodepools.AddNodePool(params, authWriter)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	// validate response.
+	if creationResult.Payload.NodeSpec != nil {
+		if creationResult.Payload.NodeSpec.Aws != nil {
+			if instanceType != "" && creationResult.Payload.NodeSpec.Aws.InstanceType != instanceType {
+				cliutil.Complain(microerror.Newf("'node_spec.aws.instance_type' in node pool creation response is not %s", instanceType))
+			}
+		} else {
+			cliutil.Complain(microerror.New("'node_spec.aws' in node pool creation response is nil"))
+		}
+	} else {
+		cliutil.Complain(microerror.New("'node_spec' in node pool creation response is nil"))
+	}
+
+	if len(creationResult.Payload.AvailabilityZones) != 0 {
+		if len(availabilityZones) != 0 {
+			if !cmp.Equal(creationResult.Payload.AvailabilityZones, availabilityZones) {
+				cliutil.Complain(microerror.Newf("\n%s\n", cmp.Diff(availabilityZones, creationResult.Payload.AvailabilityZones)))
+			}
+		}
+	} else {
+		cliutil.Complain(microerror.New("'availability_zones' in node pool creation response is empty"))
+	}
+
+	return creationResult.Payload.ID, nil
+}
+
+// CreateKeyPair tests key pair creation for the new cluster
 // and stores away the key pair in a kubectl config file for later use.
-func Test06CreateKeyPair(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter, clusterID string, clusterAPIEndpoint string) (string, error) {
+func CreateKeyPair(giantSwarmClient *client.Client, clusterID string, clusterAPIEndpoint string) (string, error) {
 	description := "test key pair"
 	req := &models.V4AddKeyPairRequest{
 		TTLHours:                 12,
@@ -171,7 +241,12 @@ func Test06CreateKeyPair(giantSwarmClient *gsclient.Gsclientgen, authWriter runt
 	}
 	params := key_pairs.NewAddKeyPairParams().WithClusterID(clusterID).WithBody(req)
 
-	addKeyPairResponse, err := giantSwarmClient.KeyPairs.AddKeyPair(params, authWriter)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	addKeyPairResponse, err := giantSwarmClient.GSClientGen.KeyPairs.AddKeyPair(params, authWriter)
 	if err != nil {
 		if myErr, ok := err.(*key_pairs.AddKeyPairDefault); ok {
 			return "", microerror.Maskf(err, "Code=%d, Details: %s", myErr.Code(), myErr.Payload.Message)
@@ -196,8 +271,8 @@ func Test06CreateKeyPair(giantSwarmClient *gsclient.Gsclientgen, authWriter runt
 	return path, nil
 }
 
-// Test07GetKubernetesNodes used kubectl to get a list of cluster nodes and returns an error if that fails.
-func Test07GetKubernetesNodes(kubeconfigPath string) error {
+// RunKubectlCommandToTestKeyPair used kubectl to get a list of cluster nodes and returns an error if that fails.
+func RunKubectlCommandToTestKeyPair(kubeconfigPath string) error {
 	out, exitCode, err := shell.RunCommand(context.Background(), "kubectl", []string{}, "--kubeconfig", kubeconfigPath, "get", "nodes")
 	if err != nil {
 		return microerror.Mask(err)
@@ -208,9 +283,9 @@ func Test07GetKubernetesNodes(kubeconfigPath string) error {
 	return nil
 }
 
-// Test08DeployTestApp attempts to deploy a helloworld app on the cluster.
+// DeployTestApp attempts to deploy a helloworld app on the cluster.
 // Returns the ingress URL of the app.
-func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
+func DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (string, error) {
 	// cluster base domain based on API endpoint
 	clusterBaseDomain := strings.Replace(clusterAPIEndpoint, "https://api.", "", 1)
 
@@ -241,13 +316,16 @@ func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (stri
 		resp, err := http.Get(endpoint)
 		if err != nil {
 			return err
-		} else if resp.StatusCode >= 400 {
+		}
+
+		cliutil.PrintInfo("Got status code %d", resp.StatusCode)
+		if resp.StatusCode >= 400 {
 			return microerror.Mask(fmt.Errorf("Got bad response from endpoint: status code %d", resp.StatusCode))
 		}
 
 		return nil
 	}
-	err = backoff.Retry(operation, backoff.NewConstantBackOff(1*time.Second))
+	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
@@ -260,13 +338,13 @@ func Test08DeployTestApp(kubeconfigPath string, clusterAPIEndpoint string) (stri
 	return endpoint, nil
 }
 
-// Test09CreateLoadOnIngress sets a constant load on the given URL.
-func Test09CreateLoadOnIngress(ingressEndpoint string) {
-	go load.ProduceLoad(ingressEndpoint, 3*time.Hour, 100_000_000)
+// CreateLoadOnIngress sets a constant load on the given URL.
+func CreateLoadOnIngress(ingressEndpoint string) {
+	go load.ProduceLoad(ingressEndpoint, 5*time.Hour, 100_000_000_000)
 }
 
-// Test10IncreaseReplicas increases the test app replicas.
-func Test10IncreaseReplicas(kubeconfigPath string) error {
+// IncreaseTestAppReplicas increases the test app replicas.
+func IncreaseTestAppReplicas(kubeconfigPath string) error {
 	out, exitCode, err := shell.RunCommand(context.Background(), "kubectl", []string{}, "--kubeconfig", kubeconfigPath, "scale", "--replicas=5", "deployment/e2e-app")
 	if err != nil {
 		return microerror.Mask(err)
@@ -277,14 +355,108 @@ func Test10IncreaseReplicas(kubeconfigPath string) error {
 	return nil
 }
 
-// Test20ClusterDeletion tests whether a cluster gets deleted okay.
-func Test20ClusterDeletion(giantSwarmClient *gsclient.Gsclientgen, authWriter runtime.ClientAuthInfoWriter, clusterID string) error {
+// DeleteCluster tests whether a cluster gets deleted okay.
+func DeleteCluster(giantSwarmClient *client.Client, clusterID string) error {
 	deleteClusterOneParams := clusters.NewDeleteClusterParams().WithClusterID(clusterID)
-	_, err := giantSwarmClient.Clusters.DeleteCluster(deleteClusterOneParams, authWriter)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	_, err = giantSwarmClient.GSClientGen.Clusters.DeleteCluster(deleteClusterOneParams, authWriter)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
 	cliutil.PrintSuccess("Cluster %s has been deleted", clusterID)
 	return nil
+}
+
+// DeleteNodePool tests whether a node pool can be deleted.
+func DeleteNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolID string) error {
+	params := nodepools.NewDeleteNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	_, err = giantSwarmClient.GSClientGen.Nodepools.DeleteNodePool(params, authWriter)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	cliutil.PrintSuccess("Nodepool %s/%s has been deleted", clusterID, nodePoolID)
+	return nil
+}
+
+// ScaleNodePool tests whether a node pool can be scaled.
+func ScaleNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolID string, min int, max int) error {
+	modifyBody := &models.V5ModifyNodePoolRequest{
+		Scaling: &models.V5ModifyNodePoolRequestScaling{
+			Min: int64(min),
+			Max: int64(max),
+		},
+	}
+	params := nodepools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	response, err := giantSwarmClient.GSClientGen.Nodepools.ModifyNodePool(params, authWriter)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if response.Payload.Scaling == nil {
+		cliutil.Complain(microerror.New("'scaling' is missing in node pool modification response"))
+	} else {
+		if response.Payload.Scaling.Min != int64(min) {
+			cliutil.Complain(microerror.Newf("'scaling.min' in node pool modification response is not %d", min))
+		}
+		if response.Payload.Scaling.Min != int64(max) {
+			cliutil.Complain(microerror.Newf("'scaling.min' in node pool modification response is not %d", max))
+		}
+	}
+
+	cliutil.PrintSuccess("Nodepool %s/%s has been scaled", clusterID, nodePoolID)
+	return nil
+}
+
+// RenameNodePool tests whether a node pool can be renamed.
+func RenameNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolID string, name string) error {
+	modifyBody := &models.V5ModifyNodePoolRequest{
+		Name: name,
+	}
+	params := nodepools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	response, err := giantSwarmClient.GSClientGen.Nodepools.ModifyNodePool(params, authWriter)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if response.Payload.Name != name {
+		cliutil.Complain(microerror.Newf("'name' in node pool modification response is not %q", name))
+	}
+
+	cliutil.PrintSuccess("Nodepool %s/%s has been renamed", clusterID, nodePoolID)
+	return nil
+}
+
+// GetNodePoolDetails returns details on a node pool
+func GetNodePoolDetails(giantSwarmClient *client.Client, clusterID string, nodePoolID string) (*models.V5GetNodePoolResponse, error) {
+	params := nodepools.NewGetNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+	details, err := giantSwarmClient.GSClientGen.Nodepools.GetNodePool(params, authWriter)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	return details.Payload, nil
 }

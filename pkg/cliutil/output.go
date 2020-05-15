@@ -27,10 +27,7 @@ func Complain(err error) {
 
 	fmt.Printf("%s: %s\n", color.RedString("ERROR"), color.WhiteString(err.Error()))
 
-	stack := microerror.Stack(err)
-	if stack != err.Error() {
-		fmt.Println(microerror.Stack(err))
-	}
+	fmt.Printf("Error details: %s\n", microerror.JSON(err))
 }
 
 // PrintSuccess just prints a success message.

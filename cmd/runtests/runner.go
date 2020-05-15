@@ -12,9 +12,9 @@ import (
 	"github.com/giantswarm/micrologger"
 	"github.com/spf13/cobra"
 
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/client"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/cliutil"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/uat"
+	"github.com/giantswarm/api-acceptance-test/pkg/client"
+	"github.com/giantswarm/api-acceptance-test/pkg/cliutil"
+	"github.com/giantswarm/api-acceptance-test/pkg/uat"
 )
 
 type runner struct {
@@ -64,7 +64,7 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	if r.flag.ClusterID == "" {
 		// 1. Create a cluster with one node pool based on defaults.
 		fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults - %s\n", time.Now())
-		clusterOneID, clusterOneAPIEndpoint, err = uat.CreateClusterUsingDefaults(apiClient)
+		clusterOneID, clusterOneAPIEndpoint, err = uat.CreateClusterUsingDefaults(apiClient, r.flag.OwnerOrganization, r.flag.ReleaseVersion)
 		cliutil.ExitIfError(err)
 	} else {
 		clusterOneID = r.flag.ClusterID
@@ -99,44 +99,6 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 		nodePoolOneID = r.flag.FirstNodePoolID
 	}
 
-	// Create key pair
-	fmt.Printf("\nStep 3 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
-	kubeconfigPath, err := uat.CreateKeyPair(apiClient, clusterOneID, clusterOneAPIEndpoint)
-	cliutil.ExitIfError(err)
-
-	// Test kubectl access
-	fmt.Printf("\nStep 4 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
-	operation := func() error {
-		return uat.RunKubectlCommandToTestKeyPair(kubeconfigPath)
-	}
-	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
-	cliutil.ExitIfError(err)
-
-	// Deploy test app
-	fmt.Printf("\nStep 5 - Deploy test app - %s", time.Now())
-	testAppURL, err := uat.DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
-	cliutil.ExitIfError(err)
-
-	// Create load
-	fmt.Printf("\nStep 6 - Create load on test app - %s\n", time.Now())
-	uat.CreateLoadOnIngress(testAppURL)
-
-	// Increase replicas
-	fmt.Printf("\nStep 7 - Increase test app replicas - %s\n", time.Now())
-	uat.IncreaseTestAppReplicas(kubeconfigPath)
-
-	// wait for nodepool scaling
-	cliutil.PrintInfo("Waiting 10 minutes for node pool to adapt")
-	for i := 0; i < 10; i++ {
-		time.Sleep(60 * time.Second)
-		details, err := uat.GetNodePoolDetails(apiClient, clusterOneID, nodePoolOneID)
-		cliutil.Complain(err)
-
-		if details != nil {
-			cliutil.PrintInfo("Node pool details - nodes desired: %d, nodes in state ready: %d", details.Status.Nodes, details.Status.NodesReady)
-		}
-	}
-
 	// rename only node pool
 	fmt.Printf("\nStep 8 - Renaming only node pool %s - %s\n", nodePoolOneID, time.Now())
 	err = uat.RenameNodePool(apiClient, clusterOneID, nodePoolOneID, "First test node pool")
@@ -147,15 +109,67 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	err = uat.ScaleNodePool(apiClient, clusterOneID, nodePoolOneID, 2, 2)
 	cliutil.Complain(err)
 
+	// Create key pair
+	kubeconfigPath := ""
+	fmt.Printf("\nStep 3 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
+	operation := func() error {
+		kubeconfigPath, err = uat.CreateKeyPair(apiClient, clusterOneID, clusterOneAPIEndpoint)
+		if err != nil {
+			// Retry on error 503
+			if uat.IsNotYetAvailable(err) {
+				return err
+			}
+			// Fail in other case
+			cliutil.ExitIfError(err)
+		}
+
+		return nil
+	}
+	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
+	cliutil.ExitIfError(err)
+
+	// Test kubectl access
+	fmt.Printf("\nStep 4 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
+	operation = func() error {
+		return uat.RunKubectlCommandToTestKeyPair(kubeconfigPath)
+	}
+	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
+	cliutil.ExitIfError(err)
+
 	// delete only node pool
-	// fmt.Printf("\nStep 10 - Deleting only node pool %s - %s\n", nodePoolOneID, time.Now())
-	// err = uat.DeleteNodePool(apiClient, clusterOneID, nodePoolOneID)
-	// cliutil.Complain(err)
+	fmt.Printf("\nStep 10 - Deleting only node pool %s - %s\n", nodePoolOneID, time.Now())
+	err = uat.DeleteNodePool(apiClient, clusterOneID, nodePoolOneID)
+	cliutil.Complain(err)
 
 	// Delete cluster one.
-	// fmt.Printf("\nStep 20 - Delete cluster - %s\n", time.Now())
-	// err = uat.Test20ClusterDeletion(apiClient, clusterOneID)
+	fmt.Printf("\nStep 20 - Delete cluster - %s\n", time.Now())
+	err = uat.DeleteCluster(apiClient, clusterOneID)
+	cliutil.Complain(err)
+
+	// // Deploy test app
+	// fmt.Printf("\nStep 5 - Deploy test app - %s", time.Now())
+	// testAppURL, err := uat.DeployTestApp(kubeconfigPath, clusterOneAPIEndpoint)
 	// cliutil.ExitIfError(err)
+
+	// // Create load
+	// fmt.Printf("\nStep 6 - Create load on test app - %s\n", time.Now())
+	// uat.CreateLoadOnIngress(testAppURL)
+
+	// // Increase replicas
+	// fmt.Printf("\nStep 7 - Increase test app replicas - %s\n", time.Now())
+	// uat.IncreaseTestAppReplicas(kubeconfigPath)
+
+	// // wait for nodepool autoscaling
+	// cliutil.PrintInfo("Waiting 10 minutes for node pool to adapt")
+	// for i := 0; i < 10; i++ {
+	// 	time.Sleep(60 * time.Second)
+	// 	details, err := uat.GetNodePoolDetails(apiClient, clusterOneID, nodePoolOneID)
+	// 	cliutil.Complain(err)
+
+	// 	if details != nil {
+	// 		cliutil.PrintInfo("Node pool details - nodes desired: %d, nodes in state ready: %d", details.Status.Nodes, details.Status.NodesReady)
+	// 	}
+	// }
 
 	return nil
 }

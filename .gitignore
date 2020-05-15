@@ -3,3 +3,4 @@ node-pools-acceptance-test
 kubeconfig_*
 testapp-manifest.yaml
 load.log
+api-acceptance-test

@@ -30,7 +30,7 @@ type Client struct {
 func New(endpointURL string) (*Client, error) {
 	u, err := url.Parse(endpointURL)
 	if err != nil {
-		return nil, microerror.New("invalid endpoint URL")
+		return nil, microerror.Maskf(invalidConfigError, "invalid endpoint URL")
 	}
 
 	tlsConfig := &tls.Config{}
@@ -76,7 +76,7 @@ func (c *Client) AuthHeaderWriter() (runtime.ClientAuthInfoWriter, error) {
 func (c *Client) GetToken() (string, error) {
 	// Check if it has a refresh token.
 	if c.RefreshToken == "" {
-		return "", microerror.New("No refresh token saved in config file, unable to acquire new access token. Please login again.")
+		return "", microerror.Maskf(invalidConfigError, "No refresh token saved in config file, unable to acquire new access token. Please login again.")
 	}
 
 	if isTokenExpired(c.AccessToken) {

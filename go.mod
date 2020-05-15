@@ -1,26 +1,21 @@
-module github.com/giantswarm/node-pools-acceptance-test
+module github.com/giantswarm/api-acceptance-test
 
-go 1.13
+go 1.14
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/fatih/color v1.7.0
-	github.com/giantswarm/gscliauth v0.0.0-20190725094024-6a88de70cd85
-	github.com/giantswarm/gsclientgen v0.0.0-20191015083620-e0141356a233 // pinned
-	github.com/giantswarm/microerror v0.0.0-20190815145748-cb07ec533b50
+	github.com/fatih/color v1.9.0
+	github.com/giantswarm/gscliauth v0.2.1
+	github.com/giantswarm/gsclientgen v1.0.2-0.20200507100632-8ff496037482
+	github.com/giantswarm/microerror v0.2.0
 	github.com/giantswarm/micrologger v0.0.0-20191014091141-d866337f7393
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
 	github.com/go-openapi/runtime v0.19.6
 	github.com/go-openapi/strfmt v0.19.3
-	github.com/gobuffalo/packr v1.30.1 // indirect
-	github.com/google/go-cmp v0.3.0
-	github.com/juju/errgo v0.0.0-20140925100237-08cceb5d0b53 // indirect
-	github.com/mattn/go-colorable v0.1.4 // indirect
-	github.com/mattn/go-isatty v0.0.9 // indirect
-	github.com/skratchdot/open-golang v0.0.0-20190402232053-79abb63cd66e // indirect
+	github.com/google/go-cmp v0.3.1
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.8
 )

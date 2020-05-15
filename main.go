@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
+	"github.com/giantswarm/api-acceptance-test/cmd"
+	"github.com/giantswarm/api-acceptance-test/pkg/project"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
-	"github.com/giantswarm/node-pools-acceptance-test/cmd"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/project"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +47,17 @@ func mainE(ctx context.Context) error {
 
 	err = rootCommand.Execute()
 	if err != nil {
-		logger.LogCtx(ctx, "level", "error", "message", "failed to execute command", "stack", microerror.Stack(err))
+		fmt.Println(color.RedString("\nTests could not be started"))
+		fmt.Println("Please check the error details below.")
+
+		if mErr, ok := err.(*microerror.Error); ok {
+			fmt.Printf("Kind: %s\n", mErr.Kind)
+			if mErr.Docs != "" {
+				fmt.Printf("Documentation: %s\n", mErr.Docs)
+			}
+		}
+
+		fmt.Printf("Error: %s\n", err)
 		os.Exit(1)
 	}
 

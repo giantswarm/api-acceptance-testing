@@ -11,17 +11,17 @@ import (
 	"github.com/giantswarm/gsclientgen/client/clusters"
 	"github.com/giantswarm/gsclientgen/client/info"
 	"github.com/giantswarm/gsclientgen/client/key_pairs"
-	"github.com/giantswarm/gsclientgen/client/nodepools"
+	"github.com/giantswarm/gsclientgen/client/node_pools"
 	"github.com/giantswarm/gsclientgen/models"
 	"github.com/giantswarm/microerror"
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/afero"
 
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/client"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/cliutil"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/kubeconfig"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/load"
-	"github.com/giantswarm/node-pools-acceptance-test/pkg/shell"
+	"github.com/giantswarm/api-acceptance-test/pkg/client"
+	"github.com/giantswarm/api-acceptance-test/pkg/cliutil"
+	"github.com/giantswarm/api-acceptance-test/pkg/kubeconfig"
+	"github.com/giantswarm/api-acceptance-test/pkg/load"
+	"github.com/giantswarm/api-acceptance-test/pkg/shell"
 )
 
 // TestClient verifies whether the given client can authenticate.
@@ -46,7 +46,7 @@ func TestClient(giantSwarmClient *client.Client) error {
 // CreateClusterUsingDefaults tests
 // - whether we can create a cluster
 // - whether defaults are applied as expected.
-func CreateClusterUsingDefaults(giantSwarmClient *client.Client) (string, string, error) {
+func CreateClusterUsingDefaults(giantSwarmClient *client.Client, ownerOrg string, releaseVersion string) (string, string, error) {
 	var creationResult *clusters.AddClusterV5Created
 	var err error
 
@@ -55,10 +55,16 @@ func CreateClusterUsingDefaults(giantSwarmClient *client.Client) (string, string
 		return "", "", microerror.Mask(err)
 	}
 
-	org := "giantswarm"
+	clusterName := "api-acceptance-testing "
+	if releaseVersion != "" {
+		clusterName += "v" + releaseVersion + " "
+	}
+	clusterName += time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+
 	req := &models.V5AddClusterRequest{
-		Owner:          &org,
-		ReleaseVersion: "8.6.0", // TODO: temporary hack
+		Name:           clusterName,
+		Owner:          &ownerOrg,
+		ReleaseVersion: releaseVersion,
 	}
 	params := clusters.NewAddClusterV5Params().WithBody(req)
 	creationResult, err = giantSwarmClient.GSClientGen.Clusters.AddClusterV5(params, authWriter)
@@ -67,30 +73,30 @@ func CreateClusterUsingDefaults(giantSwarmClient *client.Client) (string, string
 	}
 
 	// Verify cluster details
-	if creationResult.Payload.Name != "Unnamed cluster" {
-		cliutil.Complain(microerror.Newf("Cluster name is not 'Unnamed cluster' but '%s'", creationResult.Payload.Name))
+	if creationResult.Payload.Name != clusterName {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster name is not 'Unnamed cluster' but '%s'", creationResult.Payload.Name))
 	}
 	if creationResult.Payload.APIEndpoint == "" {
-		cliutil.Complain(microerror.New("Cluster api_endpoint is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster api_endpoint is empty"))
 	}
 	if creationResult.Payload.Master == nil {
-		cliutil.Complain(microerror.New("Cluster master is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master is empty"))
 	} else if creationResult.Payload.Master.AvailabilityZone == "" {
-		cliutil.Complain(microerror.New("Cluster master.availability_zone is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master.availability_zone is empty"))
 	}
 	if creationResult.Payload.ReleaseVersion == "" {
-		cliutil.Complain(microerror.New("Cluster release_version is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster release_version is empty"))
 	}
 	if creationResult.Payload.CreateDate == "" {
-		cliutil.Complain(microerror.New("Cluster create_date is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster create_date is empty"))
 	}
 	if creationResult.Payload.Owner == "" {
-		cliutil.Complain(microerror.New("Cluster owner is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster owner is empty"))
 	}
 
 	if creationResult.Payload.ID == "" {
 		// we can't continue without this
-		return "", "", microerror.New("Cluster ID is empty")
+		return "", "", microerror.Maskf(assertionFailedError, "Cluster ID is empty")
 	}
 
 	cliutil.PrintSuccess("Cluster created with ID %s", creationResult.Payload.ID)
@@ -100,73 +106,73 @@ func CreateClusterUsingDefaults(giantSwarmClient *client.Client) (string, string
 // CreateNodePoolUsingDefaults ensures that a node pool can be created with minimal spec and defaults apply.
 func CreateNodePoolUsingDefaults(giantSwarmClient *client.Client, clusterID string) (string, error) {
 	var err error
-	var creationResult *nodepools.AddNodePoolCreated
+	var creationResult *node_pools.AddNodePoolCreated
 
 	req := &models.V5AddNodePoolRequest{}
-	params := nodepools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
+	params := node_pools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
-	creationResult, err = giantSwarmClient.GSClientGen.Nodepools.AddNodePool(params, authWriter)
+	creationResult, err = giantSwarmClient.GSClientGen.NodePools.AddNodePool(params, authWriter)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
 
 	// validation creation result
 	if creationResult.Payload.Name == "" {
-		cliutil.Complain(microerror.New("'name' is missing in node pool creation response"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'name' is missing in node pool creation response"))
 	}
 
 	if len(creationResult.Payload.AvailabilityZones) == 0 {
-		cliutil.Complain(microerror.New("'availability_zones' in node pool creation response is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'availability_zones' in node pool creation response is empty"))
 	} else if len(creationResult.Payload.AvailabilityZones) > 1 {
-		cliutil.Complain(microerror.Newf("'availability_zones' has % items instead of 1", len(creationResult.Payload.AvailabilityZones)))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'availability_zones' has % items instead of 1", len(creationResult.Payload.AvailabilityZones)))
 	}
 
 	if creationResult.Payload.Scaling == nil {
-		cliutil.Complain(microerror.New("'scaling' is missing in node pool creation response"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling' is missing in node pool creation response"))
 	} else {
 		if creationResult.Payload.Scaling.Min != 3 {
-			cliutil.Complain(microerror.New("'scaling.min' in node pool creation response is != 3"))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling.min' in node pool creation response is != 3"))
 		}
 		if creationResult.Payload.Scaling.Max != 10 {
-			cliutil.Complain(microerror.New("'scaling.max' in node pool creation response is != 10"))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling.max' in node pool creation response is != 10"))
 		}
 	}
 
 	if creationResult.Payload.Subnet == "" {
-		cliutil.Complain(microerror.New("'subnet' is missing in node pool creation response"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'subnet' is missing in node pool creation response"))
 	}
 
 	if creationResult.Payload.NodeSpec == nil {
-		cliutil.Complain(microerror.New("'node_spec' is missing in node pool creation response"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec' is missing in node pool creation response"))
 	} else {
 		if creationResult.Payload.NodeSpec.Aws == nil {
-			cliutil.Complain(microerror.New("'node_spec.aws' is missing in node pool creation response"))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.aws' is missing in node pool creation response"))
 		} else {
 			if creationResult.Payload.NodeSpec.Aws.InstanceType == "" {
-				cliutil.Complain(microerror.New("'node_spec.aws.instance_type' is missing in node pool creation response"))
+				cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.aws.instance_type' is missing in node pool creation response"))
 			} else {
 				cliutil.PrintInfo("'node_spec.aws.instance_type' is %s", creationResult.Payload.NodeSpec.Aws.InstanceType)
 			}
 		}
 
 		if creationResult.Payload.NodeSpec.VolumeSizesGb == nil {
-			cliutil.Complain(microerror.New("'node_spec.volume_sizes_gb' is missing in node pool creation response"))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.volume_sizes_gb' is missing in node pool creation response"))
 		} else {
 			if creationResult.Payload.NodeSpec.VolumeSizesGb.Docker == 0 {
-				cliutil.Complain(microerror.New("'node_spec.volume_sizes_gb.docker' in node pool creation response is zero"))
+				cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.volume_sizes_gb.docker' in node pool creation response is zero"))
 			}
 			if creationResult.Payload.NodeSpec.VolumeSizesGb.Kubelet == 0 {
-				cliutil.Complain(microerror.New("'node_spec.volume_sizes_gb.kubelet' in node pool creation response is zero"))
+				cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.volume_sizes_gb.kubelet' in node pool creation response is zero"))
 			}
 		}
 	}
 
 	if creationResult.Payload.ID == "" {
 		// we can't continue without this
-		return "", microerror.New("Node pool ID is missing in node pool creation response")
+		return "", microerror.Maskf(assertionFailedError, "Node pool ID is missing in node pool creation response")
 	}
 
 	return creationResult.Payload.ID, nil
@@ -176,7 +182,7 @@ func CreateNodePoolUsingDefaults(giantSwarmClient *client.Client, clusterID stri
 // CreateNodePoolWithCustomParams checks the creation of a node pool with some custom properties.
 func CreateNodePoolWithCustomParams(giantSwarmClient *client.Client, clusterID string, instanceType string, availabilityZones []string) (string, error) {
 	var err error
-	var creationResult *nodepools.AddNodePoolCreated
+	var creationResult *node_pools.AddNodePoolCreated
 
 	// Build request body using the given arguments.
 	req := &models.V5AddNodePoolRequest{}
@@ -193,12 +199,12 @@ func CreateNodePoolWithCustomParams(giantSwarmClient *client.Client, clusterID s
 		}
 	}
 
-	params := nodepools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
+	params := node_pools.NewAddNodePoolParams().WithClusterID(clusterID).WithBody(req)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
-	creationResult, err = giantSwarmClient.GSClientGen.Nodepools.AddNodePool(params, authWriter)
+	creationResult, err = giantSwarmClient.GSClientGen.NodePools.AddNodePool(params, authWriter)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
@@ -207,23 +213,23 @@ func CreateNodePoolWithCustomParams(giantSwarmClient *client.Client, clusterID s
 	if creationResult.Payload.NodeSpec != nil {
 		if creationResult.Payload.NodeSpec.Aws != nil {
 			if instanceType != "" && creationResult.Payload.NodeSpec.Aws.InstanceType != instanceType {
-				cliutil.Complain(microerror.Newf("'node_spec.aws.instance_type' in node pool creation response is not %s", instanceType))
+				cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.aws.instance_type' in node pool creation response is not %s", instanceType))
 			}
 		} else {
-			cliutil.Complain(microerror.New("'node_spec.aws' in node pool creation response is nil"))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec.aws' in node pool creation response is nil"))
 		}
 	} else {
-		cliutil.Complain(microerror.New("'node_spec' in node pool creation response is nil"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'node_spec' in node pool creation response is nil"))
 	}
 
 	if len(creationResult.Payload.AvailabilityZones) != 0 {
 		if len(availabilityZones) != 0 {
 			if !cmp.Equal(creationResult.Payload.AvailabilityZones, availabilityZones) {
-				cliutil.Complain(microerror.Newf("\n%s\n", cmp.Diff(availabilityZones, creationResult.Payload.AvailabilityZones)))
+				cliutil.Complain(microerror.Maskf(assertionFailedError, "\n%s\n", cmp.Diff(availabilityZones, creationResult.Payload.AvailabilityZones)))
 			}
 		}
 	} else {
-		cliutil.Complain(microerror.New("'availability_zones' in node pool creation response is empty"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'availability_zones' in node pool creation response is empty"))
 	}
 
 	return creationResult.Payload.ID, nil
@@ -248,14 +254,14 @@ func CreateKeyPair(giantSwarmClient *client.Client, clusterID string, clusterAPI
 
 	addKeyPairResponse, err := giantSwarmClient.GSClientGen.KeyPairs.AddKeyPair(params, authWriter)
 	if err != nil {
-		if myErr, ok := err.(*key_pairs.AddKeyPairDefault); ok {
-			return "", microerror.Maskf(err, "Code=%d, Details: %s", myErr.Code(), myErr.Payload.Message)
+		if _, ok := err.(*key_pairs.AddKeyPairServiceUnavailable); ok {
+			return "", microerror.Mask(notYetAvailableError)
 		}
 		return "", microerror.Mask(err)
 	}
 
 	if addKeyPairResponse.Payload.ID == "" {
-		return "", microerror.New("'id' in key pair creation response is empty")
+		return "", microerror.Maskf(assertionFailedError, "'id' in key pair creation response is empty")
 	}
 
 	// store kubeconfig file
@@ -373,13 +379,13 @@ func DeleteCluster(giantSwarmClient *client.Client, clusterID string) error {
 
 // DeleteNodePool tests whether a node pool can be deleted.
 func DeleteNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolID string) error {
-	params := nodepools.NewDeleteNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
+	params := node_pools.NewDeleteNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	_, err = giantSwarmClient.GSClientGen.Nodepools.DeleteNodePool(params, authWriter)
+	_, err = giantSwarmClient.GSClientGen.NodePools.DeleteNodePool(params, authWriter)
 	if err != nil {
 		return microerror.Mask(err)
 	}
@@ -396,25 +402,25 @@ func ScaleNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolID
 			Max: int64(max),
 		},
 	}
-	params := nodepools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
+	params := node_pools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	response, err := giantSwarmClient.GSClientGen.Nodepools.ModifyNodePool(params, authWriter)
+	response, err := giantSwarmClient.GSClientGen.NodePools.ModifyNodePool(params, authWriter)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
 	if response.Payload.Scaling == nil {
-		cliutil.Complain(microerror.New("'scaling' is missing in node pool modification response"))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling' is missing in node pool modification response"))
 	} else {
 		if response.Payload.Scaling.Min != int64(min) {
-			cliutil.Complain(microerror.Newf("'scaling.min' in node pool modification response is not %d", min))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling.min' in node pool modification response is not %d", min))
 		}
 		if response.Payload.Scaling.Min != int64(max) {
-			cliutil.Complain(microerror.Newf("'scaling.min' in node pool modification response is not %d", max))
+			cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling.min' in node pool modification response is not %d", max))
 		}
 	}
 
@@ -427,19 +433,19 @@ func RenameNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolI
 	modifyBody := &models.V5ModifyNodePoolRequest{
 		Name: name,
 	}
-	params := nodepools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
+	params := node_pools.NewModifyNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID).WithBody(modifyBody)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	response, err := giantSwarmClient.GSClientGen.Nodepools.ModifyNodePool(params, authWriter)
+	response, err := giantSwarmClient.GSClientGen.NodePools.ModifyNodePool(params, authWriter)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
 	if response.Payload.Name != name {
-		cliutil.Complain(microerror.Newf("'name' in node pool modification response is not %q", name))
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'name' in node pool modification response is not %q", name))
 	}
 
 	cliutil.PrintSuccess("Nodepool %s/%s has been renamed", clusterID, nodePoolID)
@@ -448,12 +454,12 @@ func RenameNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolI
 
 // GetNodePoolDetails returns details on a node pool
 func GetNodePoolDetails(giantSwarmClient *client.Client, clusterID string, nodePoolID string) (*models.V5GetNodePoolResponse, error) {
-	params := nodepools.NewGetNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
+	params := node_pools.NewGetNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)
 	authWriter, err := giantSwarmClient.AuthHeaderWriter()
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
-	details, err := giantSwarmClient.GSClientGen.Nodepools.GetNodePool(params, authWriter)
+	details, err := giantSwarmClient.GSClientGen.NodePools.GetNodePool(params, authWriter)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}

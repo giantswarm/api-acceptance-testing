@@ -9,8 +9,8 @@ import (
 	"github.com/giantswarm/micrologger"
 	"github.com/spf13/cobra"
 
-	"github.com/giantswarm/node-pools-acceptance-test/cmd/runtests"
-	"github.com/giantswarm/node-pools-acceptance-test/cmd/version"
+	"github.com/giantswarm/api-acceptance-test/cmd/runtests"
+	"github.com/giantswarm/api-acceptance-test/cmd/version"
 )
 
 const (

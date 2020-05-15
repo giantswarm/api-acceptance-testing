@@ -4,7 +4,7 @@ var (
 	description = "Test suite for node pools functionality"
 	gitSHA      = "n/a"
 	name        = "npat"
-	source      = "https://github.com/giantswarm/node-pools-acceptance-test"
+	source      = "https://github.com/giantswarm/api-acceptance-test"
 	version     = "n/a"
 )
 

@@ -452,6 +452,30 @@ func RenameNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolI
 	return nil
 }
 
+// UpgradeCluster ...
+func UpgradeCluster(giantSwarmClient *client.Client, clusterID string, releaseVersion string) error {
+	modifyBody := &models.V5ModifyClusterRequest{
+		ReleaseVersion: releaseVersion,
+	}
+	params := clusters.NewModifyClusterV5Params().WithClusterID(clusterID).WithBody(modifyBody)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	response, err := giantSwarmClient.GSClientGen.Clusters.ModifyClusterV5(params, authWriter)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if response.Payload.ReleaseVersion != releaseVersion {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "'release_version' in cluster modification response is not %q", releaseVersion))
+	}
+
+	cliutil.PrintSuccess("Cluster %s has been upgraded", clusterID)
+	return nil
+}
+
 // GetNodePoolDetails returns details on a node pool
 func GetNodePoolDetails(giantSwarmClient *client.Client, clusterID string, nodePoolID string) (*models.V5GetNodePoolResponse, error) {
 	params := node_pools.NewGetNodePoolParams().WithClusterID(clusterID).WithNodepoolID(nodePoolID)

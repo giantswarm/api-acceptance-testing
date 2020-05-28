@@ -82,10 +82,117 @@ func CreateClusterUsingDefaults(giantSwarmClient *client.Client, ownerOrg string
 	if creationResult.Payload.Master == nil {
 		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master is empty"))
 	} else if creationResult.Payload.Master.AvailabilityZone == "" {
-		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master.availability_zone is empty"))
+		cliutil.PrintInfo("'creationResult.Payload.Master.AvailabilityZone' is empty.")
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.Master.AvailabilityZone' is %s", creationResult.Payload.Master.AvailabilityZone)
+	}
+	if creationResult.Payload.MasterNodes == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane master is empty"))
+	} else if creationResult.Payload.MasterNodes.AvailabilityZones == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane availability_zones is empty"))
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.AvailabilityZones' is %s", creationResult.Payload.MasterNodes.AvailabilityZones)
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.HighAvailability' is %t", creationResult.Payload.MasterNodes.HighAvailability)
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.NumReady' is %d", creationResult.Payload.MasterNodes.NumReady)
 	}
 	if creationResult.Payload.ReleaseVersion == "" {
 		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster release_version is empty"))
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.ReleaseVersion' is %s", creationResult.Payload.ReleaseVersion)
+	}
+	if creationResult.Payload.CreateDate == "" {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster create_date is empty"))
+	}
+	if creationResult.Payload.Owner == "" {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster owner is empty"))
+	}
+
+	if creationResult.Payload.ID == "" {
+		// we can't continue without this
+		return "", "", microerror.Maskf(assertionFailedError, "Cluster ID is empty")
+	}
+
+	cliutil.PrintSuccess("Cluster created with ID %s", creationResult.Payload.ID)
+	return creationResult.Payload.ID, creationResult.Payload.APIEndpoint, nil
+}
+
+// CreateClusterUsingDefaults tests
+// - whether we can create a cluster
+// - whether defaults are applied as expected.
+func CreateCluster(giantSwarmClient *client.Client, ownerOrg string, releaseVersion string, style string, AZ string, HighAvailability bool) (string, string, error) {
+	var creationResult *clusters.AddClusterV5Created
+	var err error
+
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return "", "", microerror.Mask(err)
+	}
+
+	clusterName := "api-acceptance-testing "
+	if releaseVersion != "" {
+		clusterName += "v" + releaseVersion + " "
+	}
+	clusterName += time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+
+	req := &models.V5AddClusterRequest{
+		Name:           clusterName,
+		Owner:          &ownerOrg,
+		ReleaseVersion: releaseVersion,
+	}
+
+	if style == "old" {
+		req = &models.V5AddClusterRequest{
+			Name:           clusterName,
+			Owner:          &ownerOrg,
+			ReleaseVersion: releaseVersion,
+			Master: &models.V5AddClusterRequestMaster{
+				AvailabilityZone: AZ,
+			},
+		}
+	} else if style == "new" {
+		req = &models.V5AddClusterRequest{
+			Name:           clusterName,
+			Owner:          &ownerOrg,
+			ReleaseVersion: releaseVersion,
+			MasterNodes: &models.V5AddClusterRequestMasterNodes{
+				HighAvailability: &HighAvailability,
+			},
+		}
+	}
+
+	params := clusters.NewAddClusterV5Params().WithBody(req)
+	creationResult, err = giantSwarmClient.GSClientGen.Clusters.AddClusterV5(params, authWriter)
+	if err != nil {
+		return "", "", microerror.Mask(err)
+	}
+
+	// Verify cluster details
+	if creationResult.Payload.Name != clusterName {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster name is not 'Unnamed cluster' but '%s'", creationResult.Payload.Name))
+	}
+	if creationResult.Payload.APIEndpoint == "" {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster api_endpoint is empty"))
+	}
+	if creationResult.Payload.Master == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master is empty"))
+	} else if creationResult.Payload.Master.AvailabilityZone == "" {
+		cliutil.PrintInfo("'creationResult.Payload.Master.AvailabilityZone' is empty.")
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.Master.AvailabilityZone' is %s", creationResult.Payload.Master.AvailabilityZone)
+	}
+	if creationResult.Payload.MasterNodes == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane master is empty"))
+	} else if creationResult.Payload.MasterNodes.AvailabilityZones == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane availability_zones is empty"))
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.AvailabilityZones' is %s", creationResult.Payload.MasterNodes.AvailabilityZones)
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.HighAvailability' is %t", creationResult.Payload.MasterNodes.HighAvailability)
+		cliutil.PrintInfo("'creationResult.Payload.MasterNodes.NumReady' is %d", creationResult.Payload.MasterNodes.NumReady)
+	}
+	if creationResult.Payload.ReleaseVersion == "" {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster release_version is empty"))
+	} else {
+		cliutil.PrintInfo("'creationResult.Payload.ReleaseVersion' is %s", creationResult.Payload.ReleaseVersion)
 	}
 	if creationResult.Payload.CreateDate == "" {
 		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster create_date is empty"))
@@ -139,10 +246,6 @@ func CreateNodePoolUsingDefaults(giantSwarmClient *client.Client, clusterID stri
 		if creationResult.Payload.Scaling.Max != 10 {
 			cliutil.Complain(microerror.Maskf(assertionFailedError, "'scaling.max' in node pool creation response is != 10"))
 		}
-	}
-
-	if creationResult.Payload.Subnet == "" {
-		cliutil.Complain(microerror.Maskf(assertionFailedError, "'subnet' is missing in node pool creation response"))
 	}
 
 	if creationResult.Payload.NodeSpec == nil {

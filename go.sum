@@ -27,8 +27,11 @@ github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/giantswarm/gscliauth v0.2.1 h1:DPO3dido3306/mgPs9DMz5V6IP3rXNc/s5mVh7YZ5yw=
 github.com/giantswarm/gscliauth v0.2.1/go.mod h1:Ys1puKDjd31rt6VDUwbJg8G3RkoLNLwisOwHxTjyKIc=
+github.com/giantswarm/gsclientgen v1.0.1 h1:5SEyUx1SpuTptRZ49nl1+HL3SditgM+YvsSta8e+RLw=
 github.com/giantswarm/gsclientgen v1.0.2-0.20200507100632-8ff496037482 h1:SXOCs0gqjqHZV2ugPzVV0PE5WgpAXN/sLGQI55ElKiA=
 github.com/giantswarm/gsclientgen v1.0.2-0.20200507100632-8ff496037482/go.mod h1:6/9SZF0LQbz3eY0h2Gh1zBZkXtky8OfYVbhDQXj33S4=
+github.com/giantswarm/gsclientgen v1.0.2-0.20200527112937-c00f7a259eec h1:gsWD0g3SZFGNKElEaqzaa1RfpIkchsFl9bxg3bYmhy4=
+github.com/giantswarm/gsclientgen v1.0.2-0.20200527112937-c00f7a259eec/go.mod h1:6/9SZF0LQbz3eY0h2Gh1zBZkXtky8OfYVbhDQXj33S4=
 github.com/giantswarm/microerror v0.2.0 h1:SaE7S34mp/wEiQkgtPiq8wQbNUTCj1gjiCWPjO3wgJo=
 github.com/giantswarm/microerror v0.2.0/go.mod h1:1YtJq/m7Vlq1Y6NP7B+SODOKCGlG7e5wctV2OoE9n34=
 github.com/giantswarm/micrologger v0.0.0-20191014091141-d866337f7393 h1:iwdDYJLDPkWo71fPO57Q40qNsjpXlH/KNznqgByo0xA=

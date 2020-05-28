@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/giantswarm/gsclientgen/client/clusters"
 	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/micrologger"
@@ -64,7 +63,7 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	if r.flag.ClusterID == "" {
 		// 1. Create a cluster with one node pool based on defaults.
 		fmt.Printf("\nStep 1 - Create a cluster with one node pool based on defaults - %s\n", time.Now())
-		clusterOneID, clusterOneAPIEndpoint, err = uat.CreateClusterUsingDefaults(apiClient, r.flag.OwnerOrganization, r.flag.ReleaseVersion)
+		clusterOneID, clusterOneAPIEndpoint, err = uat.CreateCluster(apiClient, r.flag.OwnerOrganization, "11.5.0", "new", "", true)
 		cliutil.ExitIfError(err)
 	} else {
 		clusterOneID = r.flag.ClusterID
@@ -110,31 +109,31 @@ func (r *runner) run(ctx context.Context, cmd *cobra.Command, args []string) err
 	cliutil.Complain(err)
 
 	// Create key pair
-	kubeconfigPath := ""
-	fmt.Printf("\nStep 3 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
-	operation := func() error {
-		kubeconfigPath, err = uat.CreateKeyPair(apiClient, clusterOneID, clusterOneAPIEndpoint)
-		if err != nil {
-			// Retry on error 503
-			if uat.IsNotYetAvailable(err) {
-				return err
-			}
-			// Fail in other case
-			cliutil.ExitIfError(err)
-		}
+	// kubeconfigPath := ""
+	// fmt.Printf("\nStep 3 - Create a key pair for cluster %s with k8s endpoint '%s' - %s\n", clusterOneID, clusterOneAPIEndpoint, time.Now())
+	// operation := func() error {
+	// 	kubeconfigPath, err = uat.CreateKeyPair(apiClient, clusterOneID, clusterOneAPIEndpoint)
+	// 	if err != nil {
+	// 		// Retry on error 503
+	// 		if uat.IsNotYetAvailable(err) {
+	// 			return err
+	// 		}
+	// 		// Fail in other case
+	// 		cliutil.ExitIfError(err)
+	// 	}
 
-		return nil
-	}
-	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
-	cliutil.ExitIfError(err)
+	// 	return nil
+	// }
+	// err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
+	// cliutil.ExitIfError(err)
 
 	// Test kubectl access
-	fmt.Printf("\nStep 4 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
-	operation = func() error {
-		return uat.RunKubectlCommandToTestKeyPair(kubeconfigPath)
-	}
-	err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
-	cliutil.ExitIfError(err)
+	// fmt.Printf("\nStep 4 - Access cluster's K8s API %s with kubeconfig file %s - %s\n(Take your time, we wait until it succeeds.)\n", clusterOneAPIEndpoint, kubeconfigPath, time.Now())
+	// operation = func() error {
+	// 	return uat.RunKubectlCommandToTestKeyPair(kubeconfigPath)
+	// }
+	// err = backoff.Retry(operation, backoff.NewConstantBackOff(10*time.Second))
+	// cliutil.ExitIfError(err)
 
 	// delete only node pool
 	fmt.Printf("\nStep 10 - Deleting only node pool %s - %s\n", nodePoolOneID, time.Now())

@@ -128,7 +128,7 @@ func CreateCluster(giantSwarmClient *client.Client, ownerOrg string, releaseVers
 		return "", "", microerror.Mask(err)
 	}
 
-	clusterName := "api-acceptance-testing "
+	clusterName := "Antonia api-acceptance-testing "
 	if releaseVersion != "" {
 		clusterName += "v" + releaseVersion + " "
 	}
@@ -552,6 +552,44 @@ func RenameNodePool(giantSwarmClient *client.Client, clusterID string, nodePoolI
 	}
 
 	cliutil.PrintSuccess("Nodepool %s/%s has been renamed", clusterID, nodePoolID)
+	return nil
+}
+
+// RenameNodePool tests whether a node pool can be renamed.
+func UpdateClusterToHA(giantSwarmClient *client.Client, clusterID string, highAvailability bool) error {
+	modifyBody := &models.V5ModifyClusterRequest{
+		MasterNodes: &models.V5ModifyClusterRequestMasterNodes{
+			HighAvailability: highAvailability,
+		},
+	}
+	params := clusters.NewModifyClusterV5Params().WithClusterID(clusterID).WithBody(modifyBody)
+	authWriter, err := giantSwarmClient.AuthHeaderWriter()
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	response, err := giantSwarmClient.GSClientGen.Clusters.ModifyClusterV5(params, authWriter)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if response.Payload.Master == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "Cluster master is empty"))
+	} else if response.Payload.Master.AvailabilityZone == "" {
+		cliutil.PrintInfo("'response.Payload.Master.AvailabilityZone' is empty.")
+	} else {
+		cliutil.PrintInfo("'response.Payload.Master.AvailabilityZone' is %s", response.Payload.Master.AvailabilityZone)
+	}
+	if response.Payload.MasterNodes == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane master is empty"))
+	} else if response.Payload.MasterNodes.AvailabilityZones == nil {
+		cliutil.Complain(microerror.Maskf(assertionFailedError, "ControlPlane availability_zones is empty"))
+	} else {
+		cliutil.PrintInfo("'response.Payload.MasterNodes.AvailabilityZones' is %s", response.Payload.MasterNodes.AvailabilityZones)
+		cliutil.PrintInfo("'response.Payload.MasterNodes.HighAvailability' is %t", response.Payload.MasterNodes.HighAvailability)
+		cliutil.PrintInfo("'response.Payload.MasterNodes.NumReady' is %d", response.Payload.MasterNodes.NumReady)
+	}
+
+	cliutil.PrintSuccess("Cluster %s has been updated to HA", clusterID)
 	return nil
 }
 
